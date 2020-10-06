@@ -10,7 +10,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-var MemcCommandRegexp = regexp.MustCompile(`(\S+) (\S+) \S+ (\S+)`)
+var MemcCommandRegexp = regexp.MustCompile(`^(?P<command>[a-z]+) (?P<key>\S+)`)
 
 type Memcap struct {
 	iface string
@@ -42,23 +42,31 @@ func (mc *Memcap) Run() error {
 		return err
 	}
 
+	done := make(chan bool)
 	errCh := make(chan error)
 
 	packets := 0
 
+	stats := NewStats()
+
 	go func() {
 		var (
-			eth layers.Ethernet
-			ip4 layers.IPv4
-			tcp layers.TCP
-			pl  gopacket.Payload
+			eth     layers.Ethernet
+			ip4     layers.IPv4
+			tcp     layers.TCP
+			payload gopacket.Payload
 		)
 
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp, &pl)
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp, &payload)
 		decoded := []gopacket.LayerType{}
 
 		src := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range src.Packets() {
+			select {
+			case <-done:
+				return
+			default:
+			}
 			//fmt.Printf("%s\n", packet.Dump())
 
 			// for _, layer := range packet.Layers() {
@@ -77,7 +85,16 @@ func (mc *Memcap) Run() error {
 				case layers.LayerTypeTCP:
 				case gopacket.LayerTypePayload:
 					packets++
-					fmt.Printf("%s\n", string(pl.Payload()))
+
+					m := MemcCommandRegexp.FindStringSubmatch(string(payload.Payload()))
+					if m == nil {
+						continue
+					}
+
+					command := m[1]
+					key := m[2]
+
+					stats.Add(key, command)
 				}
 			}
 		}
@@ -89,6 +106,9 @@ func (mc *Memcap) Run() error {
 	case <-time.After(mc.d):
 		fmt.Printf("Finished after %s. Processed %d packets\n", mc.d.String(), packets)
 	}
+
+	done <- true
+	// fmt.Printf("%+v\n", stats)
 
 	return nil
 }
