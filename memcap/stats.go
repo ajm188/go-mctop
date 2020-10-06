@@ -11,8 +11,8 @@ type Stats struct {
 
 func NewStats() *Stats {
 	return &Stats{
-		map[string]*KeyStats{},
-		map[string]int{},
+		keys:     map[string]*KeyStats{},
+		commands: map[string]int{},
 	}
 }
 
