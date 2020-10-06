@@ -19,5 +19,12 @@ func main() {
 	flag.CommandLine = flags
 	flag.Parse()
 
-	memcap.NewMemcap(*iface)
+	mc, err := memcap.NewMemcap(*iface, *port, *t)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := mc.Run(); err != nil {
+		panic(err)
+	}
 }
