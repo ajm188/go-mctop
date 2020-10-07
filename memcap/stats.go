@@ -8,7 +8,8 @@ import (
 type Stats struct {
 	keys         map[string]*KeyStats
 	keyStats     []*KeyStats
-	commands     map[string]int
+	commands     map[string]*CallStats
+	commandStats []*CallStats
 	commandCount int
 	// keys map[string]int
 }
@@ -16,12 +17,12 @@ type Stats struct {
 func NewStats() *Stats {
 	return &Stats{
 		keys:     map[string]*KeyStats{},
-		commands: map[string]int{},
+		commands: map[string]*CallStats{},
 	}
 }
 
-func (s *Stats) Calls() map[string]int {
-	return s.commands
+func (s *Stats) Calls() []*CallStats {
+	return s.commandStats
 }
 
 func (s *Stats) TotalCalls() int {
@@ -56,12 +57,29 @@ func (s *Stats) Add(key, command string) {
 
 	_, ok = s.commands[command]
 	if !ok {
-		s.commands[command] = 0
+		cs := &CallStats{
+			call:  command,
+			count: 0,
+		}
+		s.commands[command] = cs
+		s.commandStats = append(s.commandStats, cs)
 	}
 
-	s.commands[command]++
+	s.commands[command].count++
 	s.commandCount++
 }
+
+type CallStats struct {
+	call  string
+	count int
+}
+
+func (cs *CallStats) Add() {
+	cs.count++
+}
+
+func (cs *CallStats) Name() string { return cs.call }
+func (cs *CallStats) Count() int   { return cs.count }
 
 type KeyStats struct {
 	key string
@@ -120,6 +138,14 @@ func (ks *KeyStats) Add(command string) bool {
 }
 
 // Who doesn't love some boilerplate?
+
+type CallsList []*CallStats
+
+func (cl CallsList) Len() int           { return len(cl) }
+func (cl CallsList) Less(i, j int) bool { return cl[i].count < cl[j].count }
+func (cl CallsList) Swap(i, j int)      { cl[i], cl[j] = cl[j], cl[i] }
+
+// More boilerplate!
 // Consider writing a generator for this; probably want to sort by any of the fields.
 
 func (ks *KeyStats) Key() string  { return ks.key }
@@ -127,6 +153,10 @@ func (ks *KeyStats) Gets() int    { return ks.gets }
 func (ks *KeyStats) Sets() int    { return ks.sets }
 func (ks *KeyStats) Adds() int    { return ks.adds }
 func (ks *KeyStats) Deletes() int { return ks.deletes }
+
+func (ks *KeyStats) Writes() int {
+	return ks.sets + ks.adds + ks.deletes
+}
 
 func (ks *KeyStats) TotalCalls() int { return ks.total }
 

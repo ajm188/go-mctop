@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sort"
 	"syscall"
-	"text/tabwriter"
 	"time"
 
 	"github.com/ajm188/go-mctop/memcap"
+	"github.com/ajm188/go-mctop/ui"
 )
 
 var (
@@ -33,40 +32,54 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
 
+	doneSniffing := make(chan bool, 1)
+	doneDrawing := make(chan bool, 1)
+
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	go func() {
 		<-quit
+		doneSniffing <- true
+		doneDrawing <- true
+	}()
+
+	if err := ui.Init(doneDrawing); err != nil {
+		panic(err)
+	}
+	defer ui.Close()
+
+	go func() {
+		if err := mc.Run(doneSniffing); err != nil {
+			fmt.Println(err)
+		}
+
 		done <- true
 	}()
 
-	if err := mc.Run(done); err != nil {
-		panic(err)
-	}
+	go func() {
+		ticker := time.Tick(time.Second * 3)
 
-	stats := mc.GetStats()
+		// Wait for some data to arrive, then do an initial draw.
+		time.Sleep(time.Millisecond * 100)
+		draw(mc.GetStats())
 
-	tw := tabwriter.NewWriter(os.Stdout, 10, 4, 0, ' ', 0)
-	fmt.Fprintln(tw, "call\tops")
-	for call, count := range stats.Calls() {
-		fmt.Fprintf(tw, "%s\t%d\n", call, count)
-	}
+		for {
+			select {
+			case <-ticker:
+				stats := mc.GetStats()
+				draw(stats)
+			case <-doneDrawing:
+				done <- true
+				return
+			}
+		}
+	}()
 
-	fmt.Fprintf(tw, "(total)\t%d\n", stats.TotalCalls())
-	tw.Flush()
+	<-done
+}
 
-	// TODO: add flags for sorting by gets, by keysize, etc
-	kss := memcap.KeyStatsList(stats.KeyStats())
-	sort.Sort(sort.Reverse(kss)) // biggest first
-
-	fmt.Fprintln(tw, "")
-
-	fmt.Fprintln(tw, "key\tgets\tsets\tadds\tdeletes\tTOTAL")
-	for _, ks := range kss {
-		fmt.Fprintf(tw, "%s\t%d\t%d\t%d\t%d\t%d\n", ks.Key(), ks.Gets(), ks.Sets(), ks.Adds(), ks.Deletes(), ks.TotalCalls())
-	}
-
-	tw.Flush()
-
-	// fmt.Printf("%v %d\n", stats.Calls(), stats.TotalCalls())
+func draw(stats *memcap.Stats) {
+	ui.UpdateCalls(stats)
+	ui.UpdateKeys(stats)
+	ui.Render()
 }
