@@ -48,6 +48,8 @@ func (s *Stats) Add(key, command string) {
 	if !ok {
 		ks = &KeyStats{key: key}
 		s.keys[key] = ks
+		// TODO: consider sort-stable insertion rather than appending.
+		// Should make the rendering phase faster.
 		s.keyStats = append(s.keyStats, ks)
 	}
 

@@ -43,6 +43,15 @@ func main() {
 		doneDrawing <- true
 	}()
 
+	// TODO: more complex, but allow mctop to operate in two modes:
+	// 1. report mode, which never renders a termui, but produces a detailed text report
+	// 2. ui mode, which does all this drawing stuff. it's way more expensive to do,
+	// 	  mostly due to the constant sorting of an ever-growing list of key stats, so
+	//	  mctop should let you get stats without forcing you to pay that cost.
+	//
+	// Thought: if you include a -duration flag, it runs in report mode for the specified
+	// duration, but if you omit that flag it runs in ui mode indefinitely.
+
 	if err := ui.Init(doneDrawing); err != nil {
 		panic(err)
 	}
@@ -57,8 +66,10 @@ func main() {
 	}()
 
 	go func() {
+		// TODO: this interval should be configurable
 		ticker := time.Tick(time.Second * 3)
 
+		// TODO: make the initial wait time configurable
 		// Wait for some data to arrive, then do an initial draw.
 		time.Sleep(time.Millisecond * 100)
 		draw(mc.GetStats())
