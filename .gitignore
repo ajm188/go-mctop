@@ -5,6 +5,9 @@
 *.so
 *.dylib
 
+# Binary, built with `go build`
+mctop
+
 # Test binary, built with `go test -c`
 *.test
 
