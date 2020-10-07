@@ -1,9 +1,13 @@
 package memcap
 
-import "log"
+import (
+	"log"
+	"sort"
+)
 
 type Stats struct {
 	keys         map[string]*KeyStats
+	keyStats     []*KeyStats
 	commands     map[string]int
 	commandCount int
 	// keys map[string]int
@@ -24,6 +28,10 @@ func (s *Stats) TotalCalls() int {
 	return s.commandCount
 }
 
+func (s *Stats) KeyStats() []*KeyStats {
+	return s.keyStats
+}
+
 // func (s *Stats) Add(key string) {
 // 	_, ok := s.keys[key]
 // 	if !ok {
@@ -37,8 +45,9 @@ func (s *Stats) TotalCalls() int {
 func (s *Stats) Add(key, command string) {
 	ks, ok := s.keys[key]
 	if !ok {
-		ks = &KeyStats{}
+		ks = &KeyStats{key: key}
 		s.keys[key] = ks
+		s.keyStats = append(s.keyStats, ks)
 	}
 
 	if !ks.Add(command) {
@@ -55,6 +64,8 @@ func (s *Stats) Add(key, command string) {
 }
 
 type KeyStats struct {
+	key string
+
 	gets    int
 	casgets int
 
@@ -107,3 +118,28 @@ func (ks *KeyStats) Add(command string) bool {
 
 	return true
 }
+
+// Who doesn't love some boilerplate?
+// Consider writing a generator for this; probably want to sort by any of the fields.
+
+func (ks *KeyStats) Key() string  { return ks.key }
+func (ks *KeyStats) Gets() int    { return ks.gets }
+func (ks *KeyStats) Sets() int    { return ks.sets }
+func (ks *KeyStats) Adds() int    { return ks.adds }
+func (ks *KeyStats) Deletes() int { return ks.deletes }
+
+func (ks *KeyStats) TotalCalls() int { return ks.total }
+
+type KeyStatsList []*KeyStats
+
+func (ksl KeyStatsList) Len() int           { return len(ksl) }
+func (ksl KeyStatsList) Less(i, j int) bool { return ksl[i].total < ksl[j].total } // should consider breaking ties by key name
+func (ksl KeyStatsList) Swap(i, j int)      { ksl[i], ksl[j] = ksl[j], ksl[i] }
+
+type KeyStatsByGet []*KeyStats
+
+func (ksl KeyStatsByGet) Len() int           { return len(ksl) }
+func (ksl KeyStatsByGet) Less(i, j int) bool { return ksl[i].gets < ksl[j].gets }
+func (ksl KeyStatsByGet) Swap(i, j int)      { ksl[i], ksl[j] = ksl[j], ksl[i] }
+
+var _ sort.Interface = KeyStatsList([]*KeyStats{})

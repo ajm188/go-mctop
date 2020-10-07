@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/ajm188/go-mctop/memcap"
@@ -42,5 +44,29 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("%v %d\n", mc.GetStats().Calls(), mc.GetStats().TotalCalls())
+	stats := mc.GetStats()
+
+	tw := tabwriter.NewWriter(os.Stdout, 10, 4, 0, ' ', 0)
+	fmt.Fprintln(tw, "call\tops")
+	for call, count := range stats.Calls() {
+		fmt.Fprintf(tw, "%s\t%d\n", call, count)
+	}
+
+	fmt.Fprintf(tw, "(total)\t%d\n", stats.TotalCalls())
+	tw.Flush()
+
+	// TODO: add flags for sorting by gets, by keysize, etc
+	kss := memcap.KeyStatsList(stats.KeyStats())
+	sort.Sort(sort.Reverse(kss)) // biggest first
+
+	fmt.Fprintln(tw, "")
+
+	fmt.Fprintln(tw, "key\tgets\tsets\tadds\tdeletes\tTOTAL")
+	for _, ks := range kss {
+		fmt.Fprintf(tw, "%s\t%d\t%d\t%d\t%d\t%d\n", ks.Key(), ks.Gets(), ks.Sets(), ks.Adds(), ks.Deletes(), ks.TotalCalls())
+	}
+
+	tw.Flush()
+
+	// fmt.Printf("%v %d\n", stats.Calls(), stats.TotalCalls())
 }
