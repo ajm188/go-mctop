@@ -2,6 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ajm188/go-mctop/memcap"
@@ -24,7 +28,19 @@ func main() {
 		panic(err)
 	}
 
-	if err := mc.Run(); err != nil {
+	quit := make(chan os.Signal, 1)
+	done := make(chan bool, 1)
+
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+
+	go func() {
+		<-quit
+		done <- true
+	}()
+
+	if err := mc.Run(done); err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("%v %d\n", mc.GetStats().Calls(), mc.GetStats().TotalCalls())
 }

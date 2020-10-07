@@ -19,6 +19,8 @@ type Memcap struct {
 	d time.Duration
 
 	filter string
+
+	stats *Stats
 }
 
 func NewMemcap(iface string, port int, d time.Duration) (*Memcap, error) {
@@ -29,10 +31,16 @@ func NewMemcap(iface string, port int, d time.Duration) (*Memcap, error) {
 		d: d,
 
 		filter: fmt.Sprintf("tcp and port %d", port),
+
+		stats: NewStats(),
 	}, nil
 }
 
-func (mc *Memcap) Run() error {
+func (mc *Memcap) GetStats() *Stats {
+	return mc.stats
+}
+
+func (mc *Memcap) Run(done chan bool) error {
 	handle, err := pcap.OpenLive(mc.iface, 3200, true, pcap.BlockForever)
 	if err != nil {
 		return err
@@ -42,12 +50,9 @@ func (mc *Memcap) Run() error {
 		return err
 	}
 
-	done := make(chan bool)
 	errCh := make(chan error)
 
 	packets := 0
-
-	stats := NewStats()
 
 	go func() {
 		var (
@@ -94,7 +99,7 @@ func (mc *Memcap) Run() error {
 					command := m[1]
 					key := m[2]
 
-					stats.Add(key, command)
+					mc.stats.Add(key, command)
 				}
 			}
 		}

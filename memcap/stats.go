@@ -16,6 +16,14 @@ func NewStats() *Stats {
 	}
 }
 
+func (s *Stats) Calls() map[string]int {
+	return s.commands
+}
+
+func (s *Stats) TotalCalls() int {
+	return s.commandCount
+}
+
 // func (s *Stats) Add(key string) {
 // 	_, ok := s.keys[key]
 // 	if !ok {
